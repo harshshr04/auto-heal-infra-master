@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-Heal Infrastructure Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #8B5CF6;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --info: #3B82F6;
+            --cyan: #06B6D4;
+            --purple: #A855F7;
+            --bg-primary: #0A1628;
+            --bg-secondary: #0F1F3A;
+            --bg-card: #0D1B2E;
+            --text-primary: #E2E8F0;
+            --text-secondary: #94A3B8;
+            --border: #1E3A5F;
+            --glow-cyan: rgba(6, 182, 212, 0.5);
+            --glow-purple: rgba(168, 85, 247, 0.5);
+            --glow-blue: rgba(14, 165, 233, 0.5);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: linear-gradient(135deg, #0A1628 0%, #0F1F3A 50%, #0A1628 100%);
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, transparent 70%);
+            top: -300px;
+            right: -300px;
+            animation: float 20s ease-in-out infinite;
+            filter: blur(60px);
+        }
+
+        .bg-animation::after {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%);
+            bottom: -250px;
+            left: -250px;
+            animation: float 15s ease-in-out infinite reverse;
+            filter: blur(60px);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: rgba(13, 27, 46, 0.95);
+            border-right: 1px solid rgba(14, 165, 233, 0.2);
+            padding: 32px 24px;
+            z-index: 100;
+            transition: transform 0.3s ease;
+            backdrop-filter: blur(20px);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 48px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 20px;
+            color: white;
+            box-shadow: 0 0 25px rgba(14, 165, 233, 0.5);
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .nav-menu {
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: rgba(14, 165, 233, 0.15);
+            color: var(--cyan);
+            border-left: 3px solid var(--cyan);
+            padding-left: 13px;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.2);
+        }
+
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            padding: 32px;
+            min-height: 100vh;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search-box {
+            background: rgba(13, 27, 46, 0.6);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            border-radius: 12px;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 300px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .search-box:focus-within {
+            border-color: var(--cyan);
+            box-shadow: 0 0 25px rgba(14, 165, 233, 0.3);
+        }
+
+        .search-box input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            width: 100%;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            color: white;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(14, 165, 233, 0.5),
+                        0 0 30px rgba(14, 165, 233, 0.3);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: rgba(13, 27, 46, 0.6);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            border-radius: 20px;
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
+                        0 0 0 1px rgba(14, 165, 233, 0.1) inset;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
+                        0 0 40px rgba(14, 165, 233, 0.2),
+                        0 0 0 1px rgba(14, 165, 233, 0.3) inset;
+            border-color: rgba(14, 165, 233, 0.6);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .stat-icon.cpu { 
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(6, 182, 212, 0.2)); 
+            color: var(--cyan);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+        }
+        .stat-icon.memory { 
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.2)); 
+            color: var(--purple);
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+        }
+        .stat-icon.disk { 
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2)); 
+            color: var(--success);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+        .stat-icon.lambda { 
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.2)); 
+            color: var(--warning);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .stat-trend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .stat-trend.up {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-trend.down {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 42px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-subtext {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Chart Cards */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .chart-card {
+            background: rgba(13, 27, 46, 0.6);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            border-radius: 20px;
+            padding: 28px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
+                        0 0 0 1px rgba(14, 165, 233, 0.1) inset;
+            transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+            border-color: rgba(14, 165, 233, 0.5);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4),
+                        0 0 30px rgba(14, 165, 233, 0.15);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chart-btn {
+            padding: 8px 16px;
+            background: rgba(14, 165, 233, 0.1);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            border-radius: 8px;
+            color: var(--cyan);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chart-btn:hover {
+            background: rgba(14, 165, 233, 0.2);
+            border-color: rgba(14, 165, 233, 0.5);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+        }
+
+        .chart-btn.active {
+            background: rgba(14, 165, 233, 0.3);
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Services Grid */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .service-card {
+            background: rgba(13, 27, 46, 0.6);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+            border-radius: 20px;
+            padding: 28px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .service-card:hover {
+            border-color: rgba(14, 165, 233, 0.4);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4),
+                        0 0 25px rgba(14, 165, 233, 0.15);
+            transform: translateY(-4px);
+        }
+
+        .service-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .service-logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .service-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .service-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .service-status.online {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .service-status.offline {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .service-details {
+            display: grid;
+            gap: 12px;
+        }
+
+        .service-detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .detail-label {
+            color: var(--text-secondary);
+        }
+
+        .detail-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .service-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .service-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .service-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        /* Loading States */
+        .skeleton {
+            background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s ease-in-out infinite;
+            border-radius: 8px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .stats-grid,
+            .chart-grid,
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.1));
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-icon {
+            font-size: 24px;
+        }
+
+        .alert-content h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .alert-content p {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Page Sections */
+        .page-section {
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        /* Table Styles */
+        .data-table {
+            width: 100%;
+            background: rgba(13, 27, 46, 0.6);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+            border-radius: 16px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: rgba(14, 165, 233, 0.1);
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table td {
+            padding: 16px;
+            border-top: 1px solid rgba(14, 165, 233, 0.1);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .data-table tr:hover {
+            background: rgba(14, 165, 233, 0.05);
+        }
+
+        .status-badge-small {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge-small.healthy {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .status-badge-small.warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .status-badge-small.critical {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        /* Settings Form */
+        .settings-form {
+            background: rgba(13, 27, 46, 0.6);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+            border-radius: 16px;
+            padding: 28px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            background: rgba(13, 27, 46, 0.8);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-help {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            color: white;
+            padding: 12px 32px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(14, 165, 233, 0.5);
+        }
+
+        /* AWS Login Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(13, 27, 46, 0.95);
+            border: 1px solid rgba(14, 165, 233, 0.4);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+                        0 0 40px rgba(14, 165, 233, 0.2);
+            backdrop-filter: blur(20px);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .modal-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 0 30px rgba(14, 165, 233, 0.5);
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .login-btn-container {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn-cancel {
+            flex: 1;
+            padding: 12px 24px;
+            background: rgba(71, 85, 105, 0.3);
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            color: var(--text-secondary);
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-cancel:hover {
+            background: rgba(71, 85, 105, 0.5);
+            border-color: rgba(71, 85, 105, 0.7);
+        }
+
+        .btn-login {
+            flex: 2;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            border: none;
+            color: white;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(14, 165, 233, 0.5);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .user-info-icon {
+            color: var(--success);
+            font-size: 20px;
+        }
+
+        .user-info-text {
+            flex: 1;
+            color: var(--text-primary);
+        }
+
+        .btn-logout-small {
+            padding: 6px 12px;
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: var(--danger);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-logout-small:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <!-- AWS Login Modal -->
+    <div id="awsLoginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-icon">☁️</div>
+                <div>
+                    <h2 class="modal-title">AWS Login</h2>
+                    <p class="modal-subtitle">Connect to your AWS account to fetch real-time metrics</p>
+                </div>
+            </div>
+
+            <div id="loginFormContainer">
+                <!-- Quick Login with Environment Credentials -->
+                <div style="margin-bottom: 24px; padding: 16px; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 8px;">
+                    <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 13px;">
+                        💡 <strong>Quick Login:</strong> Use your AWS CLI credentials (no need to enter keys)
+                    </p>
+                    <button class="btn-login" onclick="performEnvLogin()" style="width: 100%;">
+                        <span>☁️</span>
+                        Use AWS CLI Credentials
+                    </button>
+                </div>
+
+                <div style="text-align: center; margin: 20px 0; color: var(--text-secondary); font-size: 13px;">
+                    — OR —
+                </div>
+
+                <div class="form-group">
+                    <label>AWS Access Key ID</label>
+                    <input type="text" id="awsAccessKey" placeholder="AKIA..." autocomplete="off">
+                    <p class="form-help">Your AWS access key for CloudWatch access</p>
+                </div>
+
+                <div class="form-group">
+                    <label>AWS Secret Access Key</label>
+                    <input type="password" id="awsSecretKey" placeholder="Enter your secret key">
+                    <p class="form-help">Keep this secure - it won't be stored permanently</p>
+                </div>
+
+                <div class="form-group">
+                    <label>AWS Region</label>
+                    <select id="awsLoginRegion">
+                        <option value="us-east-1">US East (N. Virginia)</option>
+                        <option value="us-east-2">US East (Ohio)</option>
+                        <option value="us-west-1">US West (N. California)</option>
+                        <option value="us-west-2">US West (Oregon)</option>
+                        <option value="eu-west-1">EU (Ireland)</option>
+                        <option value="ap-south-1">Asia Pacific (Mumbai)</option>
+                    </select>
+                </div>
+
+                <div class="login-btn-container">
+                    <button class="btn-cancel" onclick="closeLoginModal()">Cancel</button>
+                    <button class="btn-login" onclick="performAWSLogin()">Connect with Keys</button>
+                </div>
+            </div>
+
+            <div id="loginSuccessContainer" style="display: none;">
+                <div class="user-info">
+                    <span class="user-info-icon">✅</span>
+                    <span class="user-info-text" id="loginSuccessMessage">Connected successfully!</span>
+                </div>
+                <div class="login-btn-container" style="margin-top: 16px;">
+                    <button class="btn-login" onclick="closeLoginModal()">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">AH</div>
+            <span class="logo-text">Auto-Heal</span>
+        </div>
+        
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#dashboard" class="nav-link active" onclick="switchTab('dashboard'); return false;">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#analytics" class="nav-link" onclick="switchTab('analytics'); return false;">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Analytics
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#servers" class="nav-link" onclick="switchTab('servers'); return false;">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                        </svg>
+                        Servers
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#alerts" class="nav-link" onclick="switchTab('alerts'); return false;">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        Alerts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#settings" class="nav-link" onclick="switchTab('settings'); return false;">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Settings
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div>
+                <h1 class="page-title">Infrastructure Overview</h1>
+                <p class="page-subtitle" id="currentTime">Loading...</p>
+            </div>
+            <div class="top-bar-actions">
+                <div id="userStatusContainer"></div>
+                <div class="search-box">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" placeholder="Search...">
+                </div>
+                <button class="btn btn-primary" id="awsLoginBtn" onclick="openLoginModal()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                    </svg>
+                    AWS Login
+                </button>
+                <button class="btn btn-primary" onclick="refreshMetrics()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Alert Banner -->
+        <div class="alert-banner" id="alertBanner" style="display: none;">
+            <span class="alert-icon">⚠️</span>
+            <div class="alert-content">
+                <h4>High Resource Usage Detected</h4>
+                <p id="alertMessage">Monitor your infrastructure closely</p>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboardSection" class="page-section active">
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-card::before"></div>
+                <div class="stat-header">
+                    <div class="stat-icon cpu">🖥️</div>
+                    <div class="stat-trend up">
+                        <span>↑</span>
+                        <span id="cpuTrend">0%</span>
+                    </div>
+                </div>
+                <div class="stat-label">CPU Usage</div>
+                <div class="stat-value"><span id="cpuValue">0</span>%</div>
+                <div class="stat-subtext">Average across all instances</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon memory">💾</div>
+                    <div class="stat-trend up">
+                        <span>↑</span>
+                        <span id="memoryTrend">0%</span>
+                    </div>
+                </div>
+                <div class="stat-label">Memory Usage</div>
+                <div class="stat-value"><span id="memoryValue">0</span>%</div>
+                <div class="stat-subtext">RAM utilization</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon disk">💿</div>
+                    <div class="stat-trend up">
+                        <span>↑</span>
+                        <span id="diskTrend">0%</span>
+                    </div>
+                </div>
+                <div class="stat-label">Disk Usage</div>
+                <div class="stat-value"><span id="diskValue">0</span>%</div>
+                <div class="stat-subtext">Storage utilization</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon lambda">⚡</div>
+                    <div class="stat-trend down">
+                        <span>↓</span>
+                        <span id="lambdaTrend">0%</span>
+                    </div>
+                </div>
+                <div class="stat-label">Lambda Invocations</div>
+                <div class="stat-value" id="lambdaValue">0</div>
+                <div class="stat-subtext">Last 5 minutes</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="chart-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">CPU Trends</h3>
+                    <div class="chart-actions">
+                        <button class="chart-btn">1H</button>
+                        <button class="chart-btn">24H</button>
+                        <button class="chart-btn">7D</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Memory Trends</h3>
+                    <div class="chart-actions">
+                        <button class="chart-btn">1H</button>
+                        <button class="chart-btn">24H</button>
+                        <button class="chart-btn">7D</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="memoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services -->
+        <div class="services-grid">
+            <div class="service-card">
+                <div class="service-header">
+                    <div class="service-logo" style="background: rgba(239, 68, 68, 0.1); color: #EF4444;">
+                        N
+                    </div>
+                    <div class="service-info">
+                        <h3>Nagios</h3>
+                        <span class="service-status" id="nagiosStatus">
+                            <span class="status-dot"></span>
+                            Checking...
+                        </span>
+                    </div>
+                </div>
+                <div class="service-details">
+                    <div class="service-detail-item">
+                        <span class="detail-label">Instance ID</span>
+                        <span class="detail-value" id="nagiosInstanceId">-</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Region</span>
+                        <span class="detail-value" id="nagiosRegion">-</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Endpoint</span>
+                        <span class="detail-value" id="nagiosUrl">-</span>
+                    </div>
+                </div>
+                <div class="service-actions">
+                    <button class="service-btn" onclick="openNagios()">Open Dashboard</button>
+                    <button class="service-btn" onclick="checkNagiosStatus()">Check Status</button>
+                </div>
+            </div>
+
+            <div class="service-card">
+                <div class="service-header">
+                    <div class="service-logo" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;">
+                        G
+                    </div>
+                    <div class="service-info">
+                        <h3>Grafana</h3>
+                        <span class="service-status" id="grafanaStatus">
+                            <span class="status-dot"></span>
+                            Checking...
+                        </span>
+                    </div>
+                </div>
+                <div class="service-details">
+                    <div class="service-detail-item">
+                        <span class="detail-label">Instance ID</span>
+                        <span class="detail-value" id="grafanaInstanceId">-</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Region</span>
+                        <span class="detail-value" id="grafanaRegion">-</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Endpoint</span>
+                        <span class="detail-value" id="grafanaUrl">-</span>
+                    </div>
+                </div>
+                <div class="service-actions">
+                    <button class="service-btn" onclick="openGrafana()">Open Dashboard</button>
+                    <button class="service-btn">View Metrics</button>
+                </div>
+            </div>
+
+            <div class="service-card">
+                <div class="service-header">
+                    <div class="service-logo" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6;">
+                        ⚡
+                    </div>
+                    <div class="service-info">
+                        <h3>Lambda Functions</h3>
+                        <span class="service-status" id="lambdaStatus">
+                            <span class="status-dot"></span>
+                            Checking...
+                        </span>
+                    </div>
+                </div>
+                <div class="service-details">
+                    <div class="service-detail-item">
+                        <span class="detail-label">Invocations</span>
+                        <span class="detail-value" id="lambdaInvocations">0</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Errors</span>
+                        <span class="detail-value" id="lambdaErrors">0</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Avg Duration</span>
+                        <span class="detail-value"><span id="lambdaDuration">0</span>ms</span>
+                    </div>
+                </div>
+                <div class="service-actions">
+                    <button class="service-btn">View Logs</button>
+                    <button class="service-btn">Configure</button>
+                </div>
+            </div>
+
+            <div class="service-card">
+                <div class="service-header">
+                    <div class="service-logo" style="background: rgba(16, 185, 129, 0.1); color: #10B981;">
+                        ☁️
+                    </div>
+                    <div class="service-info">
+                        <h3>AWS Account</h3>
+                        <span class="service-status" id="awsAccountStatus">
+                            <span class="status-dot"></span>
+                            Not Connected
+                        </span>
+                    </div>
+                </div>
+                <div class="service-details">
+                    <div class="service-detail-item">
+                        <span class="detail-label">Account ID</span>
+                        <span class="detail-value" id="awsAccountId">-</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Region</span>
+                        <span class="detail-value" id="awsRegion">-</span>
+                    </div>
+                    <div class="service-detail-item">
+                        <span class="detail-label">Auto-Heal</span>
+                        <span class="detail-value" id="autoHealStatus">-</span>
+                    </div>
+                </div>
+                <div class="service-actions">
+                    <button class="service-btn">View Console</button>
+                    <button class="service-btn">Settings</button>
+                </div>
+            </div>
+        </div>
+        </div>
+        <!-- End Dashboard Section -->
+
+        <!-- Analytics Section -->
+        <div id="analyticsSection" class="page-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(6, 182, 212, 0.2)); color: var(--cyan); box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);">📊</div>
+                    </div>
+                    <div class="stat-label">Total Metrics Collected</div>
+                    <div class="stat-value" id="analyticsMetricsCount">0</div>
+                    <div class="stat-subtext">Last 24 hours</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.2)); color: var(--purple); box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);">⏱️</div>
+                    </div>
+                    <div class="stat-label">Average Response Time</div>
+                    <div class="stat-value" id="analyticsAvgResponse">0ms</div>
+                    <div class="stat-subtext">Across all services</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2)); color: var(--success); box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);">✅</div>
+                    </div>
+                    <div class="stat-label">Lambda Invocations</div>
+                    <div class="stat-value" id="analyticsLambdaCount">0</div>
+                    <div class="stat-subtext">Last 5 minutes</div>
+                </div>
+            </div>
+
+            <div class="chart-card" style="margin-top: 24px;">
+                <div class="chart-header">
+                    <h3 class="chart-title">Performance Trends (Last 30 Days)</h3>
+                </div>
+                <p style="color: var(--text-secondary); padding: 40px; text-align: center;">Detailed analytics charts coming soon...</p>
+            </div>
+        </div>
+
+        <!-- Servers Section -->
+        <div id="serversSection" class="page-section">
+            <div id="serversNotLoggedIn" style="display: none; text-align: center; padding: 60px 20px;">
+                <div style="font-size: 64px; margin-bottom: 20px;">☁️</div>
+                <h3 style="color: var(--text-primary); font-size: 24px; margin-bottom: 12px;">AWS Login Required</h3>
+                <p style="color: var(--text-secondary); font-size: 16px; margin-bottom: 24px;">
+                    Please login with your AWS credentials to view server information
+                </p>
+                <button class="btn btn-primary" onclick="openLoginModal()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                    </svg>
+                    Login to AWS
+                </button>
+            </div>
+            
+            <div class="data-table" id="serversTable">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Server Name</th>
+                            <th>Instance ID</th>
+                            <th>Status</th>
+                            <th>CPU</th>
+                            <th>Memory</th>
+                            <th>Uptime</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Nagios Monitor</td>
+                            <td id="serverNagiosId">-</td>
+                            <td><span class="status-badge-small healthy">Healthy</span></td>
+                            <td id="serverNagiosCpu">0%</td>
+                            <td id="serverNagiosMemory">0%</td>
+                            <td>2d 14h</td>
+                            <td><button class="service-btn" onclick="openNagios()">View</button></td>
+                        </tr>
+                        <tr>
+                            <td>Grafana Dashboard</td>
+                            <td id="serverGrafanaId">-</td>
+                            <td><span class="status-badge-small healthy">Healthy</span></td>
+                            <td id="serverGrafanaCpu">0%</td>
+                            <td id="serverGrafanaMemory">0%</td>
+                            <td>2d 14h</td>
+                            <td><button class="service-btn" onclick="openGrafana()">View</button></td>
+                        </tr>
+                        <tr>
+                            <td>Auto-Heal Lambda</td>
+                            <td>auto-heal-lambda-fn</td>
+                            <td><span class="status-badge-small healthy">Active</span></td>
+                            <td>N/A</td>
+                            <td>N/A</td>
+                            <td>Always-on</td>
+                            <td><button class="service-btn">Configure</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div id="alertsSection" class="page-section">
+            <div id="alertsNotLoggedIn" style="display: none; text-align: center; padding: 60px 20px;">
+                <div style="font-size: 64px; margin-bottom: 20px;">🔔</div>
+                <h3 style="color: var(--text-primary); font-size: 24px; margin-bottom: 12px;">AWS Login Required</h3>
+                <p style="color: var(--text-secondary); font-size: 16px; margin-bottom: 24px;">
+                    Please login with your AWS credentials to view alert history
+                </p>
+                <button class="btn btn-primary" onclick="openLoginModal()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                    </svg>
+                    Login to AWS
+                </button>
+            </div>
+            
+            <div class="data-table" id="alertsTable">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Severity</th>
+                            <th>Service</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>2025-11-02 10:30</td>
+                            <td><span class="status-badge-small warning">Warning</span></td>
+                            <td>EC2 Instance</td>
+                            <td>High CPU usage detected (85%)</td>
+                            <td>Acknowledged</td>
+                        </tr>
+                        <tr>
+                            <td>2025-11-02 09:15</td>
+                            <td><span class="status-badge-small healthy">Info</span></td>
+                            <td>Lambda</td>
+                            <td>Auto-heal function executed successfully</td>
+                            <td>Resolved</td>
+                        </tr>
+                        <tr>
+                            <td>2025-11-01 22:45</td>
+                            <td><span class="status-badge-small critical">Critical</span></td>
+                            <td>Nagios</td>
+                            <td>Service check failed - Auto restarted</td>
+                            <td>Resolved</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div id="settingsSection" class="page-section">
+            <div class="settings-form">
+                <h3 style="color: var(--text-primary); margin-bottom: 24px; font-size: 20px;">AWS Configuration</h3>
+                <div class="form-group">
+                    <label>AWS Account ID</label>
+                    <input type="text" id="settingsAccountId" placeholder="123456789012">
+                    <p class="form-help">Your AWS Account ID for CloudWatch metrics</p>
+                </div>
+                <div class="form-group">
+                    <label>AWS Region</label>
+                    <select id="settingsRegion">
+                        <option value="us-east-1">US East (N. Virginia)</option>
+                        <option value="us-east-2">US East (Ohio)</option>
+                        <option value="us-west-1">US West (N. California)</option>
+                        <option value="us-west-2">US West (Oregon)</option>
+                        <option value="eu-west-1">EU (Ireland)</option>
+                        <option value="ap-south-1">Asia Pacific (Mumbai)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Login Required for Monitoring Endpoints -->
+            <div id="settingsNotLoggedIn" style="display: none;">
+                <div style="text-align: center; padding: 80px 40px; background: rgba(6, 182, 212, 0.03); border: 2px dashed rgba(6, 182, 212, 0.3); border-radius: 16px;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">⚙️</div>
+                    <h3 style="color: var(--text-primary); font-size: 24px; margin-bottom: 12px;">AWS Login Required</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Please login with your AWS credentials to view and configure monitoring endpoints</p>
+                    <button class="btn-login" onclick="openLoginModal()">
+                        <span>☁️</span>
+                        Login to AWS
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-form" id="settingsEndpointsForm">
+                <h3 style="color: var(--text-primary); margin-bottom: 24px; font-size: 20px;">Monitoring Endpoints</h3>
+                <div class="form-group">
+                    <label>Nagios URL</label>
+                    <input type="url" id="settingsNagiosUrl" placeholder="http://3.219.108.146/nagios">
+                </div>
+                <div class="form-group">
+                    <label>Nagios Instance ID</label>
+                    <input type="text" id="settingsNagiosInstance" placeholder="i-0fa823ceb3eeeea4a">
+                </div>
+                <div class="form-group">
+                    <label>Grafana URL</label>
+                    <input type="url" id="settingsGrafanaUrl" placeholder="http://3.222.48.52:3000">
+                </div>
+                <div class="form-group">
+                    <label>Grafana Instance ID</label>
+                    <input type="text" id="settingsGrafanaInstance" placeholder="i-01eb8b49d6572c1ff">
+                </div>
+            </div>
+
+            <div class="settings-form">
+                <h3 style="color: var(--text-primary); margin-bottom: 24px; font-size: 20px;">Alert Thresholds</h3>
+                <div class="form-group">
+                    <label>CPU Threshold (%)</label>
+                    <input type="number" id="settingsCpuThreshold" value="80" min="0" max="100">
+                    <p class="form-help">Alert when CPU usage exceeds this percentage</p>
+                </div>
+                <div class="form-group">
+                    <label>Memory Threshold (%)</label>
+                    <input type="number" id="settingsMemoryThreshold" value="85" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label>Disk Threshold (%)</label>
+                    <input type="number" id="settingsDiskThreshold" value="90" min="0" max="100">
+                </div>
+                <button class="btn-save" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            backendUrl: 'http://localhost:5001',
+            refreshInterval: 30000,
+            thresholds: {
+                cpu: 80,
+                memory: 85,
+                disk: 90
+            }
+        };
+
+        // Data storage
+        let chartData = {
+            cpu: [],
+            memory: [],
+            disk: []
+        };
+
+        let charts = {};
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('Dashboard initializing...');
+            
+            try {
+                updateTime();
+                setInterval(updateTime, 1000);
+                
+                await checkAuthStatus();
+                // Don't load config or metrics until authenticated
+                // These will be called by updateUserStatus() when authenticated
+                initCharts();
+                
+                setInterval(fetchMetrics, CONFIG.refreshInterval);
+                
+                console.log('✓ Dashboard initialized successfully');
+            } catch (error) {
+                console.error('✗ Dashboard initialization failed:', error);
+                showError('Dashboard initialization failed. Check console for details.');
+            }
+        });
+
+        // AWS Login Functions
+        async function checkAuthStatus() {
+            try {
+                const response = await axios.get(`${CONFIG.backendUrl}/api/auth-status`);
+                const status = response.data;
+                
+                updateUserStatus(status.authenticated, status.accountId, status.region);
+            } catch (error) {
+                console.error('Failed to check auth status:', error);
+            }
+        }
+
+        function updateUserStatus(authenticated, accountId, region) {
+            const container = document.getElementById('userStatusContainer');
+            const loginBtn = document.getElementById('awsLoginBtn');
+            
+            // Update servers page visibility
+            const serversNotLoggedIn = document.getElementById('serversNotLoggedIn');
+            const serversTable = document.getElementById('serversTable');
+            
+            // Update alerts page visibility
+            const alertsNotLoggedIn = document.getElementById('alertsNotLoggedIn');
+            const alertsTable = document.getElementById('alertsTable');
+            
+            // Update settings page visibility
+            const settingsNotLoggedIn = document.getElementById('settingsNotLoggedIn');
+            const settingsEndpointsForm = document.getElementById('settingsEndpointsForm');
+            
+            // Update service card statuses
+            const nagiosStatus = document.getElementById('nagiosStatus');
+            const grafanaStatus = document.getElementById('grafanaStatus');
+            const lambdaStatus = document.getElementById('lambdaStatus');
+            const awsAccountStatus = document.getElementById('awsAccountStatus');
+            const autoHealStatus = document.getElementById('autoHealStatus');
+            
+            if (authenticated) {
+                loginBtn.style.display = 'none';
+                container.innerHTML = `
+                    <div class="user-info">
+                        <span class="user-info-icon">☁️</span>
+                        <span class="user-info-text">
+                            <strong>${accountId || 'Connected'}</strong> · ${region || 'us-east-1'}
+                        </span>
+                        <button class="btn-logout-small" onclick="performLogout()">Logout</button>
+                    </div>
+                `;
+                
+                // Show servers table
+                if (serversNotLoggedIn) serversNotLoggedIn.style.display = 'none';
+                if (serversTable) serversTable.style.display = 'block';
+                
+                // Show alerts table
+                if (alertsNotLoggedIn) alertsNotLoggedIn.style.display = 'none';
+                if (alertsTable) alertsTable.style.display = 'block';
+                
+                // Show settings endpoints form
+                if (settingsNotLoggedIn) settingsNotLoggedIn.style.display = 'none';
+                if (settingsEndpointsForm) settingsEndpointsForm.style.display = 'block';
+                
+                // Update service statuses to active/online
+                if (nagiosStatus) {
+                    nagiosStatus.className = 'service-status offline';
+                    nagiosStatus.innerHTML = '<span class="status-dot"></span>Offline';
+                }
+                if (grafanaStatus) {
+                    grafanaStatus.className = 'service-status online';
+                    grafanaStatus.innerHTML = '<span class="status-dot"></span>Online';
+                }
+                if (lambdaStatus) {
+                    lambdaStatus.className = 'service-status online';
+                    lambdaStatus.innerHTML = '<span class="status-dot"></span>Active';
+                }
+                if (awsAccountStatus) {
+                    awsAccountStatus.className = 'service-status online';
+                    awsAccountStatus.innerHTML = '<span class="status-dot"></span>Connected';
+                }
+                if (autoHealStatus) {
+                    autoHealStatus.textContent = 'Enabled';
+                }
+                
+                // Load config and metrics when authenticated
+                loadConfig();
+                fetchMetrics();
+            } else {
+                loginBtn.style.display = 'flex';
+                container.innerHTML = '';
+                
+                // Hide servers table
+                if (serversNotLoggedIn) serversNotLoggedIn.style.display = 'block';
+                if (serversTable) serversTable.style.display = 'none';
+                
+                // Hide alerts table
+                if (alertsNotLoggedIn) alertsNotLoggedIn.style.display = 'block';
+                if (alertsTable) alertsTable.style.display = 'none';
+                
+                // Hide settings endpoints form
+                if (settingsNotLoggedIn) settingsNotLoggedIn.style.display = 'block';
+                if (settingsEndpointsForm) settingsEndpointsForm.style.display = 'none';
+                
+                // Update service statuses to disconnected/checking
+                if (nagiosStatus) {
+                    nagiosStatus.className = 'service-status';
+                    nagiosStatus.innerHTML = '<span class="status-dot"></span>Checking...';
+                }
+                if (grafanaStatus) {
+                    grafanaStatus.className = 'service-status';
+                    grafanaStatus.innerHTML = '<span class="status-dot"></span>Checking...';
+                }
+                if (lambdaStatus) {
+                    lambdaStatus.className = 'service-status';
+                    lambdaStatus.innerHTML = '<span class="status-dot"></span>Checking...';
+                }
+                if (awsAccountStatus) {
+                    awsAccountStatus.className = 'service-status';
+                    awsAccountStatus.innerHTML = '<span class="status-dot"></span>Not Connected';
+                }
+                if (autoHealStatus) {
+                    autoHealStatus.textContent = '-';
+                }
+                
+                // Clear instance IDs and endpoints when not authenticated
+                document.getElementById('nagiosInstanceId').textContent = '-';
+                document.getElementById('grafanaInstanceId').textContent = '-';
+                document.getElementById('nagiosRegion').textContent = '-';
+                document.getElementById('grafanaRegion').textContent = '-';
+                document.getElementById('nagiosUrl').textContent = '-';
+                document.getElementById('grafanaUrl').textContent = '-';
+                document.getElementById('awsAccountId').textContent = '-';
+                document.getElementById('awsRegion').textContent = '-';
+            }
+        }
+
+        function openLoginModal() {
+            document.getElementById('awsLoginModal').classList.add('active');
+            document.getElementById('loginFormContainer').style.display = 'block';
+            document.getElementById('loginSuccessContainer').style.display = 'none';
+            document.getElementById('awsAccessKey').value = '';
+            document.getElementById('awsSecretKey').value = '';
+        }
+
+        function closeLoginModal() {
+            document.getElementById('awsLoginModal').classList.remove('active');
+        }
+
+        async function performEnvLogin() {
+            try {
+                const region = document.getElementById('awsLoginRegion').value;
+                
+                const response = await axios.post(`${CONFIG.backendUrl}/api/login/env`, { 
+                    region: region 
+                });
+                
+                if (response.data.success) {
+                    // Show success message
+                    document.getElementById('loginSuccessMessage').textContent = 
+                        `✅ Connected to AWS Account ${response.data.accountId} (${response.data.region})`;
+                    document.getElementById('loginFormContainer').style.display = 'none';
+                    document.getElementById('loginSuccessContainer').style.display = 'block';
+                    
+                    // Refresh auth status to update UI
+                    await checkAuthStatus();
+                    
+                    // Close modal after 2 seconds
+                    setTimeout(() => {
+                        closeLoginModal();
+                    }, 2000);
+                }
+            } catch (error) {
+                const errorMsg = error.response?.data?.error || 'Failed to authenticate with environment credentials. Please ensure AWS CLI is configured or use manual login.';
+                alert('❌ ' + errorMsg);
+                console.error('Environment login error:', error);
+            }
+        }
+
+        async function performAWSLogin() {
+            const accessKey = document.getElementById('awsAccessKey').value.trim();
+            const secretKey = document.getElementById('awsSecretKey').value.trim();
+            const region = document.getElementById('awsLoginRegion').value;
+            
+            if (!accessKey || !secretKey) {
+                alert('Please enter both Access Key and Secret Key');
+                return;
+            }
+            
+            const loginBtn = document.querySelector('.btn-login');
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Connecting...';
+            
+            try {
+                const response = await axios.post(`${CONFIG.backendUrl}/api/login`, {
+                    accessKey: accessKey,
+                    secretKey: secretKey,
+                    region: region
+                });
+                
+                const result = response.data;
+                
+                if (result.success) {
+                    document.getElementById('loginFormContainer').style.display = 'none';
+                    document.getElementById('loginSuccessContainer').style.display = 'block';
+                    document.getElementById('loginSuccessMessage').innerHTML = `
+                        <strong>Connected to AWS Account ${result.accountId}</strong><br>
+                        Region: ${result.region}
+                    `;
+                    
+                    updateUserStatus(true, result.accountId, result.region);
+                    
+                    // Refresh data
+                    await loadConfig();
+                    await fetchMetrics();
+                    
+                    // Auto-close after 2 seconds
+                    setTimeout(() => {
+                        closeLoginModal();
+                    }, 2000);
+                }
+            } catch (error) {
+                const errorMsg = error.response?.data?.error || error.message;
+                alert(`Login failed: ${errorMsg}`);
+                console.error('Login error:', error);
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Connect to AWS';
+            }
+        }
+
+        async function performLogout() {
+            if (!confirm('Are you sure you want to logout? This will clear your AWS credentials.')) {
+                return;
+            }
+            
+            try {
+                await axios.post(`${CONFIG.backendUrl}/api/logout`);
+                updateUserStatus(false);
+                
+                // Refresh data to show zeros
+                await loadConfig();
+                await fetchMetrics();
+                
+                console.log('✓ Logged out successfully');
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        window.openLoginModal = openLoginModal;
+        window.closeLoginModal = closeLoginModal;
+        window.performAWSLogin = performAWSLogin;
+        window.performLogout = performLogout;
+
+        // Update time display
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        // Load configuration
+        async function loadConfig() {
+            console.log('Loading configuration from backend...');
+            try {
+                const response = await axios.get(`${CONFIG.backendUrl}/api/config`);
+                const config = response.data;
+                
+                console.log('✓ Config loaded:', config);
+                
+                document.getElementById('awsAccountId').textContent = config.awsAccountId || '-';
+                document.getElementById('awsRegion').textContent = config.region || '-';
+                document.getElementById('nagiosRegion').textContent = config.region || '-';
+                document.getElementById('grafanaRegion').textContent = config.region || '-';
+                document.getElementById('nagiosInstanceId').textContent = config.nagiosInstanceId || '-';
+                document.getElementById('grafanaInstanceId').textContent = config.grafanaInstanceId || '-';
+                document.getElementById('nagiosUrl').textContent = config.nagiosUrl ? new URL(config.nagiosUrl).hostname : '-';
+                document.getElementById('grafanaUrl').textContent = config.grafanaUrl ? new URL(config.grafanaUrl).hostname : '-';
+                
+                CONFIG.nagiosUrl = config.nagiosUrl;
+                CONFIG.grafanaUrl = config.grafanaUrl;
+                
+                await checkNagiosStatus();
+            } catch (error) {
+                console.error('✗ Failed to load config:', error);
+            }
+        }
+
+        // Fetch metrics
+        async function fetchMetrics() {
+            console.log('Fetching metrics from backend...');
+            try {
+                const response = await axios.get(`${CONFIG.backendUrl}/api/metrics`, { timeout: 8000 });
+                const metrics = response.data.data;
+                
+                console.log('✓ Metrics received:', metrics);
+                
+                updateStats(metrics);
+                updateCharts(metrics);
+                checkAlerts(metrics);
+            } catch (error) {
+                console.error('✗ Failed to fetch metrics:', error.message);
+                showError('Unable to fetch metrics. Using default values.');
+            }
+        }
+
+        // Update stats
+        function updateStats(metrics) {
+            const cpu = metrics.cpu || 0;
+            const memory = metrics.memory || 0;
+            const disk = metrics.disk || 0;
+            const lambdaInvocations = metrics.lambda_invocations || 0;
+            const lambdaErrors = metrics.lambda_errors || 0;
+            const lambdaDuration = metrics.lambda_duration || 0;
+            
+            document.getElementById('cpuValue').textContent = cpu.toFixed(1);
+            document.getElementById('memoryValue').textContent = memory.toFixed(1);
+            document.getElementById('diskValue').textContent = disk.toFixed(1);
+            document.getElementById('lambdaValue').textContent = lambdaInvocations;
+            document.getElementById('lambdaInvocations').textContent = lambdaInvocations;
+            document.getElementById('lambdaErrors').textContent = lambdaErrors;
+            document.getElementById('lambdaDuration').textContent = lambdaDuration.toFixed(0);
+            
+            // Update trends (simplified)
+            document.getElementById('cpuTrend').textContent = cpu > 0 ? `${cpu.toFixed(0)}%` : '0%';
+            document.getElementById('memoryTrend').textContent = memory > 0 ? `${memory.toFixed(0)}%` : '0%';
+            document.getElementById('diskTrend').textContent = disk > 0 ? `${disk.toFixed(0)}%` : '0%';
+            document.getElementById('lambdaTrend').textContent = lambdaInvocations > 0 ? `${lambdaInvocations}` : '0';
+            
+            // Update Analytics page
+            document.getElementById('analyticsMetricsCount').textContent = lambdaInvocations;
+            document.getElementById('analyticsAvgResponse').textContent = lambdaDuration > 0 ? `${lambdaDuration.toFixed(0)}ms` : '0ms';
+            document.getElementById('analyticsLambdaCount').textContent = lambdaInvocations;
+            
+            // Update Servers page
+            document.getElementById('serverNagiosCpu').textContent = `${cpu.toFixed(1)}%`;
+            document.getElementById('serverNagiosMemory').textContent = `${memory.toFixed(1)}%`;
+            document.getElementById('serverGrafanaCpu').textContent = `${cpu.toFixed(1)}%`;
+            document.getElementById('serverGrafanaMemory').textContent = `${memory.toFixed(1)}%`;
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const chartConfig = {
+                type: 'line',
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                            titleColor: '#F1F5F9',
+                            bodyColor: '#94A3B8',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: { 
+                                color: 'rgba(14, 165, 233, 0.1)',
+                                drawBorder: false
+                            },
+                            ticks: { 
+                                color: '#64748B',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        y: {
+                            display: true,
+                            grid: { 
+                                color: 'rgba(14, 165, 233, 0.1)',
+                                drawBorder: false
+                            },
+                            ticks: { 
+                                color: '#64748B',
+                                font: {
+                                    size: 11
+                                }
+                            },
+                            min: 0,
+                            max: 100
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            };
+
+            // CPU Chart
+            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+            const cpuGradient = cpuCtx.createLinearGradient(0, 0, 0, 300);
+            cpuGradient.addColorStop(0, 'rgba(6, 182, 212, 0.6)');
+            cpuGradient.addColorStop(0.5, 'rgba(14, 165, 233, 0.3)');
+            cpuGradient.addColorStop(1, 'rgba(14, 165, 233, 0.0)');
+
+            charts.cpu = new Chart(cpuCtx, {
+                ...chartConfig,
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'CPU %',
+                        data: [],
+                        borderColor: '#06B6D4',
+                        backgroundColor: cpuGradient,
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#06B6D4',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2,
+                        shadowOffsetX: 0,
+                        shadowOffsetY: 0,
+                        shadowBlur: 20,
+                        shadowColor: 'rgba(6, 182, 212, 0.5)'
+                    }]
+                }
+            });
+
+            // Memory Chart
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+            const memoryGradient = memoryCtx.createLinearGradient(0, 0, 0, 300);
+            memoryGradient.addColorStop(0, 'rgba(168, 85, 247, 0.6)');
+            memoryGradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.3)');
+            memoryGradient.addColorStop(1, 'rgba(139, 92, 246, 0.0)');
+
+            charts.memory = new Chart(memoryCtx, {
+                ...chartConfig,
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Memory %',
+                        data: [],
+                        borderColor: '#A855F7',
+                        backgroundColor: memoryGradient,
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#A855F7',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                }
+            });
+        }
+
+        // Update charts
+        function updateCharts(metrics) {
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            const maxPoints = 20;
+
+            // Update CPU
+            chartData.cpu.push(metrics.cpu || 0);
+            if (chartData.cpu.length > maxPoints) chartData.cpu.shift();
+            
+            charts.cpu.data.labels.push(timestamp);
+            if (charts.cpu.data.labels.length > maxPoints) charts.cpu.data.labels.shift();
+            
+            charts.cpu.data.datasets[0].data = chartData.cpu;
+            charts.cpu.update('none');
+
+            // Update Memory
+            chartData.memory.push(metrics.memory || 0);
+            if (chartData.memory.length > maxPoints) chartData.memory.shift();
+            
+            charts.memory.data.labels.push(timestamp);
+            if (charts.memory.data.labels.length > maxPoints) charts.memory.data.labels.shift();
+            
+            charts.memory.data.datasets[0].data = chartData.memory;
+            charts.memory.update('none');
+        }
+
+        // Check alerts
+        function checkAlerts(metrics) {
+            const alerts = [];
+            
+            if (metrics.cpu > CONFIG.thresholds.cpu) {
+                alerts.push(`CPU usage is high (${metrics.cpu.toFixed(1)}%)`);
+            }
+            if (metrics.memory > CONFIG.thresholds.memory) {
+                alerts.push(`Memory usage is high (${metrics.memory.toFixed(1)}%)`);
+            }
+            if (metrics.disk > CONFIG.thresholds.disk) {
+                alerts.push(`Disk usage is high (${metrics.disk.toFixed(1)}%)`);
+            }
+            
+            const alertBanner = document.getElementById('alertBanner');
+            if (alerts.length > 0) {
+                document.getElementById('alertMessage').textContent = alerts.join(' | ');
+                alertBanner.style.display = 'flex';
+            } else {
+                alertBanner.style.display = 'none';
+            }
+        }
+
+        // Check Nagios status
+        async function checkNagiosStatus() {
+            console.log('Checking Nagios status...');
+            const statusEl = document.getElementById('nagiosStatus');
+            try {
+                const response = await axios.get(`${CONFIG.backendUrl}/api/nagios?path=/cgi-bin/status.cgi`, { 
+                    timeout: 5000 
+                });
+                
+                if (response.status === 200) {
+                    statusEl.className = 'service-status online';
+                    statusEl.innerHTML = '<span class="status-dot"></span>Online';
+                    console.log('✓ Nagios is online');
+                } else {
+                    statusEl.className = 'service-status offline';
+                    statusEl.innerHTML = '<span class="status-dot"></span>Offline';
+                    console.log('✗ Nagios is offline');
+                }
+            } catch (error) {
+                console.error('Error checking Nagios:', error);
+                statusEl.className = 'service-status offline';
+                statusEl.innerHTML = '<span class="status-dot"></span>Offline';
+            }
+        }
+
+        // Helper functions
+        function refreshMetrics() {
+            console.log('Refreshing metrics...');
+            fetchMetrics();
+            showSuccess('Metrics refreshed successfully');
+        }
+
+        function openNagios() {
+            console.log('Opening Nagios:', CONFIG.nagiosUrl);
+            if (CONFIG.nagiosUrl) {
+                window.open(CONFIG.nagiosUrl, '_blank');
+            } else {
+                alert('Nagios URL not configured');
+            }
+        }
+
+        function openGrafana() {
+            console.log('Opening Grafana:', CONFIG.grafanaUrl);
+            if (CONFIG.grafanaUrl) {
+                window.open(CONFIG.grafanaUrl, '_blank');
+            } else {
+                alert('Grafana URL not configured');
+            }
+        }
+
+        function showSuccess(message) {
+            console.log('✓', message);
+            // You can add a toast notification here later
+        }
+
+        function showError(message) {
+            console.error('✗', message);
+            // You can add a toast notification here later
+        }
+
+        // Make functions globally available
+        window.refreshMetrics = refreshMetrics;
+        window.openNagios = openNagios;
+        window.openGrafana = openGrafana;
+        window.checkNagiosStatus = checkNagiosStatus;
+
+        // Tab switching function
+        function switchTab(tabName) {
+            console.log('Switching to tab:', tabName);
+            
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Add active class to clicked link
+            event.target.closest('.nav-link').classList.add('active');
+            
+            // Hide all sections
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show selected section
+            const sectionMap = {
+                'dashboard': 'dashboardSection',
+                'analytics': 'analyticsSection',
+                'servers': 'serversSection',
+                'alerts': 'alertsSection',
+                'settings': 'settingsSection'
+            };
+            
+            const sectionId = sectionMap[tabName];
+            if (sectionId) {
+                document.getElementById(sectionId).classList.add('active');
+            }
+            
+            // Update page title based on tab
+            const titles = {
+                'dashboard': 'Infrastructure Overview',
+                'analytics': 'Analytics & Reports',
+                'servers': 'Server Management',
+                'alerts': 'Alert Management',
+                'settings': 'Settings & Configuration'
+            };
+            
+            document.querySelector('.page-title').textContent = titles[tabName] || 'Infrastructure Overview';
+            
+            // Load section-specific data
+            if (tabName === 'servers') {
+                loadServerData();
+            } else if (tabName === 'settings') {
+                loadSettingsData();
+            }
+        }
+        
+        window.switchTab = switchTab;
+
+        // Load server data
+        function loadServerData() {
+            const nagiosId = document.getElementById('nagiosInstanceId')?.textContent || '-';
+            const grafanaId = document.getElementById('grafanaInstanceId')?.textContent || '-';
+            
+            document.getElementById('serverNagiosId').textContent = nagiosId;
+            document.getElementById('serverGrafanaId').textContent = grafanaId;
+        }
+
+        // Load settings data
+        function loadSettingsData() {
+            const accountId = document.getElementById('awsAccountId')?.textContent || '';
+            const region = document.getElementById('awsRegion')?.textContent || 'us-east-1';
+            const nagiosUrl = CONFIG.nagiosUrl || '';
+            const grafanaUrl = CONFIG.grafanaUrl || '';
+            const nagiosInstanceId = document.getElementById('nagiosInstanceId')?.textContent || '';
+            const grafanaInstanceId = document.getElementById('grafanaInstanceId')?.textContent || '';
+            
+            document.getElementById('settingsAccountId').value = accountId !== '-' ? accountId : '';
+            document.getElementById('settingsRegion').value = region !== '-' ? region : 'us-east-1';
+            document.getElementById('settingsNagiosUrl').value = nagiosUrl;
+            document.getElementById('settingsGrafanaUrl').value = grafanaUrl;
+            document.getElementById('settingsNagiosInstance').value = nagiosInstanceId !== '-' ? nagiosInstanceId : '';
+            document.getElementById('settingsGrafanaInstance').value = grafanaInstanceId !== '-' ? grafanaInstanceId : '';
+            document.getElementById('settingsCpuThreshold').value = CONFIG.thresholds.cpu;
+            document.getElementById('settingsMemoryThreshold').value = CONFIG.thresholds.memory;
+            document.getElementById('settingsDiskThreshold').value = CONFIG.thresholds.disk;
+        }
+
+        // Save settings
+        function saveSettings() {
+            const settings = {
+                accountId: document.getElementById('settingsAccountId').value,
+                region: document.getElementById('settingsRegion').value,
+                nagiosUrl: document.getElementById('settingsNagiosUrl').value,
+                grafanaUrl: document.getElementById('settingsGrafanaUrl').value,
+                nagiosInstanceId: document.getElementById('settingsNagiosInstance').value,
+                grafanaInstanceId: document.getElementById('settingsGrafanaInstance').value,
+                cpuThreshold: parseInt(document.getElementById('settingsCpuThreshold').value),
+                memoryThreshold: parseInt(document.getElementById('settingsMemoryThreshold').value),
+                diskThreshold: parseInt(document.getElementById('settingsDiskThreshold').value)
+            };
+            
+            console.log('Saving settings:', settings);
+            
+            // Update CONFIG object
+            CONFIG.thresholds.cpu = settings.cpuThreshold;
+            CONFIG.thresholds.memory = settings.memoryThreshold;
+            CONFIG.thresholds.disk = settings.diskThreshold;
+            CONFIG.nagiosUrl = settings.nagiosUrl;
+            CONFIG.grafanaUrl = settings.grafanaUrl;
+            
+            alert('Settings saved! Note: These settings are temporary and will reset on page reload.\n\nTo persist settings, update environment variables on the backend server.');
+        }
+
+        window.saveSettings = saveSettings;
+    </script>
+</body>
+</html>

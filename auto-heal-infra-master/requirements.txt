@@ -1,0 +1,27 @@
+# Auto-Heal Infrastructure - Python Dependencies
+# 
+# These packages are used in Lambda and optional local development
+# Lambda runtime includes boto3 pre-installed, but listed here for reference
+
+# AWS SDK for Python (pre-installed in Lambda)
+boto3>=1.26.0
+
+# For local development and testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+moto>=4.1.0  # AWS mocking for tests
+requests>=2.28.0
+
+# Code quality
+black>=23.0.0
+flake8>=6.0.0
+pylint>=2.16.0
+mypy>=0.990
+
+# Documentation
+sphinx>=5.0.0
+sphinx-rtd-theme>=1.1.0
+
+# Utilities
+python-dotenv>=0.20.0
+pyyaml>=6.0
